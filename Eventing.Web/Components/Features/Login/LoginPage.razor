@@ -1,0 +1,48 @@
+@page "/login"
+@layout EmptyLayout
+@rendermode InteractiveServer
+@inject NavigationManager NavManager
+
+<PageTitle>Login</PageTitle>
+
+<FluentStack HorizontalAlignment="HorizontalAlignment.Center"
+             VerticalAlignment="VerticalAlignment.Center"
+             Style="height:100vh;">
+<FluentCard Style="width:auto;" Height="auto">
+        <FluentEditForm Model="LoginModel" OnValidSubmit="SubmitAsync">
+            <DataAnnotationsValidator/>
+            <FluentStack Orientation="Orientation.Vertical">
+                <div>
+                    <FluentTextField Name="email" @bind-Value="LoginModel.Email" Label="Email" Placeholder="user@email.com"
+                                     Required="true">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Mail())" Slot="start" Color="Color.Neutral"/>
+                    </FluentTextField>
+                    <FluentValidationMessage For="@(() => LoginModel.Email)"/>
+                </div>
+
+                <div>
+                    <FluentTextField Name="password" @bind-Value="LoginModel.Password" Label="Password"
+                                     TextFieldType="TextFieldType.Password"
+                                     Required="true">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Password())" Slot="start" Color="@Color.Neutral"/>
+                    </FluentTextField>
+                    <FluentValidationMessage For="@(() => LoginModel.Password)"/>
+                </div>
+                <div>
+                    <FluentCheckbox @bind-Value="@LoginModel.RememberMe">Remember me</FluentCheckbox>
+                </div>
+                <div>
+                    <FluentButton  Appearance="Appearance.Accent" Type="ButtonType.Submit">Sign In</FluentButton>
+                </div>
+                <FluentStack HorizontalAlignment="HorizontalAlignment.Center" Style="margin-top:0.5rem;">
+                    <span style="color:#aaa; font-size:0.9rem;">Don't have an account?</span>
+                    <FluentButton Appearance="Appearance.Stealth"
+                                  Style="margin-left:0.25rem; font-size:0.9rem; color:#00bfff;"
+                                  @onclick="@(() => NavManager.NavigateTo("/register"))">
+                        Sign Up
+                    </FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentEditForm>
+</FluentCard>
+</FluentStack>

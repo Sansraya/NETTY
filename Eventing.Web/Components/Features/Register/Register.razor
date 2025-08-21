@@ -1,0 +1,149 @@
+@page "/register"
+@using Eventing.Web.Components.Features.Register.Dtos
+@using Eventing.Web.Components.Features.Register.Models
+@layout EmptyLayout
+@rendermode InteractiveServer
+
+@inject NavigationManager NavManager
+@inject IHttpClientFactory clientFactory
+
+<PageTitle>Register</PageTitle>
+
+<FluentStack HorizontalAlignment="HorizontalAlignment.Center"
+             VerticalAlignment="VerticalAlignment.Center"
+             Style="height:100vh;">
+    <FluentCard Style="width:auto;" Height="auto">
+        <FluentEditForm Model="@RegisterModel" OnValidSubmit="@SubmitAsync">
+            <DataAnnotationsValidator />
+            <FluentStack Orientation="Orientation.Vertical">
+
+                <!-- Username -->
+                <div>
+                    <FluentTextField Name="username"
+                                     @bind-Value="RegisterModel.Name"
+                                     Label="Username"
+                                     Placeholder="Enter username"
+                                     Required="true">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Person())" Slot="start" Color="Color.Neutral" />
+                    </FluentTextField>
+                    <FluentValidationMessage For="@(() => RegisterModel.Name)" />
+                </div>
+
+                <!-- Email -->
+                <div>
+                    <FluentTextField Name="email"
+                                     @bind-Value="RegisterModel.Email"
+                                     Label="Email"
+                                     Placeholder="user@email.com"
+                                     Required="true">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Mail())" Slot="start" Color="Color.Neutral" />
+                    </FluentTextField>
+                    <FluentValidationMessage For="@(() => RegisterModel.Email)" />
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <FluentTextField Name="password"
+                                     @bind-Value="RegisterModel.Password"
+                                     Label="Password"
+                                     TextFieldType="TextFieldType.Password"
+                                     Required="true">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Password())" Slot="start" Color="Color.Neutral" />
+                    </FluentTextField>
+                    <FluentValidationMessage For="@(() => RegisterModel.Password)" />
+                </div>
+
+                <!-- Confirm Password -->
+                <div>
+                    <FluentTextField Name="confirmPassword"
+                                     @bind-Value="RegisterModel.ConfirmPassword"
+                                     Label="Confirm Password"
+                                     TextFieldType="TextFieldType.Password"
+                                     Required="true">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Password())" Slot="start" Color="Color.Neutral" />
+                    </FluentTextField>
+                    <FluentValidationMessage For="@(() => RegisterModel.ConfirmPassword)" />
+                </div>
+
+                <!-- Message Area -->
+                @if (!string.IsNullOrEmpty(Message))
+                {
+                    <div style="margin-top:0.5rem; color:@(IsSuccess ? "green" : "red"); font-size:0.9rem;">
+                        @Message
+                    </div>
+                }
+
+                <!-- Register Button -->
+                <div>
+                    <FluentButton Appearance="Appearance.Accent" Type="ButtonType.Submit">
+                        Register
+                    </FluentButton>
+                </div>
+
+                <!-- Already have account -->
+                <FluentStack HorizontalAlignment="HorizontalAlignment.Center" Style="margin-top:0.5rem;">
+                    <span style="color:#aaa; font-size:0.9rem;">Already have an account?</span>
+                    <FluentButton Appearance="Appearance.Stealth"
+                                  Style="margin-left:0.25rem; font-size:0.9rem; color:#00bfff;"
+                                  @onclick="@(() => NavManager.NavigateTo("/login"))">
+                        Login
+                    </FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentEditForm>
+    </FluentCard>
+</FluentStack>
+
+@code {
+    private RegisterModel RegisterModel { get; set; } = new();
+
+    private string? Message { get; set; }
+    private bool IsSuccess { get; set; }
+
+    private async Task SubmitAsync()
+    {
+        if (RegisterModel.Password != RegisterModel.ConfirmPassword)
+        {
+            Message = "Passwords do not match.";
+            IsSuccess = false;
+            return;
+        }
+
+        var requestDto = new RegisterRequestDto(
+            RegisterModel.Name,
+            RegisterModel.Email,
+            RegisterModel.Password,
+            RegisterModel.ConfirmPassword
+        );
+
+        try
+        {
+            var response = await clientFactory
+                .CreateClient(Constants.HttpClients.EventingApi.Name)
+                .PostAsJsonAsync("api/account/register", requestDto);
+
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<RegisterResponseDto>();
+                Message = "Registration successful! Redirecting to login...";
+                IsSuccess = true;
+
+                // small delay before redirect
+                await Task.Delay(1500);
+                NavManager.NavigateTo("/login");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Message = $"Registration failed: {error}";
+                IsSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Message = $"Error: Unable to reach server. {ex.Message}";
+            IsSuccess = false;
+        }
+    }
+}
