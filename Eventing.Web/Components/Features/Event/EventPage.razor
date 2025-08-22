@@ -3,81 +3,220 @@
 @layout EmptyLayout
 @rendermode InteractiveServer
 
-<PageTitle>Event</PageTitle>
+<PageTitle>Events</PageTitle>
 
 @if (IsLoading)
 {
-    <FluentProgress/>
+<div class="loading-container">
+    <FluentProgress />
+</div>
 }
 else
 {
-    <FluentGrid Spacing="3" AdaptiveRendering="true" Justify="JustifyContent.FlexStart" Style="padding: 8px;">
-        @foreach (var e in Events)
+<div class="events-container">
+    <header class="page-header">
+        <h1>Events</h1>
+        <p>Discover and join upcoming events</p>
+    </header>
+
+    <div class="events-grid">
+        @foreach (var eventItem in Events)
         {
-            <FluentGridItem Id="@e.Id.ToString()" xs="12" sm="6" md="4" lg="3" xl="2">
-                <div @onclick="@(() => OpenAttendeesPanelAsync(e.Id))" style="
-                    background: #fff;
-                    border-radius: 8px;
-                    padding: 12px;
-                    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-                    display: flex;
-                    flex-direction: column;
-                    gap: 6px;
-                    height: 100%;
-                    cursor: pointer;">
+        var currentEventId = eventItem.Id;
+        <article class="event-card" @onclick="@(() => OpenAttendeesPanelAsync(currentEventId))">
+            <div class="event-header">
+                <h3 class="event-title">@eventItem.Title</h3>
+                <time class="event-time">@eventItem.StartTime.ToString("MMM dd, HH:mm") - @eventItem.EndTime.ToString("HH:mm")</time>
+            </div>
 
-                    <div>
-                        <h3 style="
-                            font-size: 1.1rem;
-                            font-weight: 600;
-                            margin: 0 0 4px;
-                            color: #222;">@e.Title</h3>
-                        <span style="
-                            font-size: 0.85rem;
-                            color: #666;">@e.StartTime.ToString("g") - @e.EndTime.ToString("g")</span>
-                    </div>
+            <div class="event-content">
+                <p class="event-description">@eventItem.Description</p>
 
-                    <div style="flex-grow: 1;">
-                        <p style="margin: 4px 0; font-size: 0.9rem; color: #444;">@e.Description</p>
-
-                        <FluentStack Direction="Row" Spacing="2" VerticalAlignment="VerticalAlignment.Center">
-                            @if (e.LocationType == LocationType.Virtual)
-                            {
-                                <FluentAnchor Href="@e.Location" IconStart="@(new Icons.Regular.Size16.Link())">
-                                    @e.Location
-                                </FluentAnchor>
-                            }
-                            else
-                            {
-                                <FluentIcon Value="@(new Icons.Regular.Size24.Location())"/>
-                                <span style="color: #888;">@e.Location</span>
-                            }
-                        </FluentStack>
-                        <p style="margin: 2px 0; font-size: 0.85rem; color: #555;">
-                            <strong>Show Attendees:</strong> @(e.ShowAttendees ? "Yes" : "No")
-                        </p>
-                        <p style="margin: 2px 0; font-size: 0.75rem; color: #888;">
-                            <FluentStack HorizontalAlignment="HorizontalAlignment.SpaceBetween"
-                                         VerticalAlignment="VerticalAlignment.Center">
-                                <div>
-                                    <FluentPersona Name="@e.CreatedBy.Name"
-                                                   ImageSize="30px">
-                                    </FluentPersona>
-                                </div>
-                                <div>
-                                    @e.CreatedAt
-                                </div>
-                            </FluentStack>
-                        </p>
-                        @if (e.UpdatedAt.HasValue)
-                        {
-                            <p style="margin: 2px 0; font-size: 0.75rem; color: #888;">
-                                Updated at: @e.UpdatedAt
-                            </p>
-                        }
-                    </div>
+                <div class="event-location">
+                    @if (eventItem.LocationType == LocationType.Virtual)
+                    {
+                    <FluentIcon Value="@(new Icons.Regular.Size16.Video())" />
+                    <span>Virtual Event</span>
+                    }
+                    else if (eventItem.LocationType == LocationType.Physical)
+                    {
+                    <FluentIcon Value="@(new Icons.Regular.Size16.Location())" />
+                    <span>@eventItem.Location</span>
+                    }
+                    else
+                    {
+                    <FluentIcon Value="@(new Icons.Regular.Size16.Globe())" />
+                    <span>@eventItem.Location</span>
+                    }
                 </div>
-            </FluentGridItem>
+
+                @if (eventItem.ShowAttendees)
+                {
+                <div class="attendees-badge">
+                    <FluentIcon Value="@(new Icons.Regular.Size16.People())" />
+                    <span>Attendees visible</span>
+                </div>
+                }
+            </div>
+
+            <footer class="event-footer">
+                <div class="creator">
+                    <FluentPersona Name="@eventItem.CreatedBy.Name" ImageSize="24px" />
+                </div>
+                <time class="created-date">@eventItem.CreatedAt.ToString("MMM dd")</time>
+            </footer>
+        </article>
         }
-    </FluentGrid>
+    </div>
+</div>
 }
+
+<style>
+    .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 200px;
+    }
+
+    .events-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .page-header {
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+
+    .page-header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--neutral-foreground-primary);
+        margin: 0 0 0.5rem;
+    }
+
+    .page-header p {
+        font-size: 1.1rem;
+        color: var(--neutral-foreground-secondary);
+        margin: 0;
+    }
+
+    .events-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .event-card {
+        background: var(--fill-color);
+        border: 1px solid var(--neutral-stroke-secondary);
+        border-radius: 12px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .event-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        border-color: var(--accent-fill-primary);
+    }
+
+    .event-header {
+        margin-bottom: 1rem;
+    }
+
+    .event-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--neutral-foreground-primary);
+        margin: 0 0 0.5rem;
+        line-height: 1.3;
+    }
+
+    .event-time {
+        font-size: 0.9rem;
+        color: var(--accent-fill-primary);
+        font-weight: 500;
+    }
+
+    .event-content {
+        flex: 1;
+        margin-bottom: 1rem;
+    }
+
+    .event-description {
+        font-size: 0.95rem;
+        color: var(--neutral-foreground-secondary);
+        line-height: 1.4;
+        margin: 0 0 1rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .event-location {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--neutral-foreground-secondary);
+        margin-bottom: 0.75rem;
+    }
+
+    .attendees-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        background: var(--accent-fill-secondary);
+        color: var(--accent-foreground-primary);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .event-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 1rem;
+        border-top: 1px solid var(--neutral-stroke-divider);
+    }
+
+    .creator {
+        display: flex;
+        align-items: center;
+    }
+
+    .created-date {
+        font-size: 0.8rem;
+        color: var(--neutral-foreground-tertiary);
+    }
+
+    @@media (max-width: 768px) {
+    .events-container {
+        padding: 1rem 0.5rem;
+    }
+
+    .page-header h1 {
+        font-size: 2rem;
+    }
+
+    .events-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .event-card {
+        padding: 1rem;
+    }
+    }
+</style>

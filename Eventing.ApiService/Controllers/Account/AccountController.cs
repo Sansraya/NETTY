@@ -69,7 +69,12 @@ public class AccountController(
     public async Task<IActionResult> RegisterAsync([FromBody] RegisterUserRequestDto dto)
     {
         IdentityUser<Guid> user = dto;
-
+        
+        user.PhoneNumberConfirmed = true;
+        user.TwoFactorEnabled = true;
+            user.LockoutEnabled = false;
+        user.EmailConfirmed = true;
+        
         var result = await userManager.CreateAsync(user, dto.Password);
         if (!result.Succeeded) return ValidationProblem(CreateValidationProblemDetails(result.Errors));
 

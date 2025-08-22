@@ -1,4 +1,5 @@
 @page "/register"
+@using System.Text.Json
 @using Eventing.Web.Components.Features.Register.Dtos
 @using Eventing.Web.Components.Features.Register.Models
 @layout EmptyLayout
@@ -65,18 +66,37 @@
                     <FluentValidationMessage For="@(() => RegisterModel.ConfirmPassword)" />
                 </div>
 
-                <!-- Message Area -->
+                <!-- Enhanced Message Area -->
                 @if (!string.IsNullOrEmpty(Message))
                 {
-                    <div style="margin-top:0.5rem; color:@(IsSuccess ? "green" : "red"); font-size:0.9rem;">
-                        @Message
+                    <div style="margin-top:0.5rem; font-size:0.9rem;">
+                        <div style="color:@(IsSuccess ? "green" : "red");">
+                            @Message
+                        </div>
+                        
+                        @if (!IsSuccess && IsDuplicateEmailError)
+                        {
+                            <div style="margin-top:0.5rem;">
+                                <FluentButton Appearance="Appearance.Stealth"
+                                              Style="font-size:0.85rem; color:#00bfff; padding:0;"
+                                              @onclick="@(() => NavManager.NavigateTo("/login"))">
+                                    Go to Login Page
+                                </FluentButton>
+                                <span style="color:#aaa; margin:0 0.5rem;">|</span>
+                                <FluentButton Appearance="Appearance.Stealth"
+                                              Style="font-size:0.85rem; color:#00bfff; padding:0;"
+                                              @onclick="@(() => NavManager.NavigateTo("/forgot-password"))">
+                                    Forgot Password?
+                                </FluentButton>
+                            </div>
+                        }
                     </div>
                 }
 
                 <!-- Register Button -->
                 <div>
-                    <FluentButton Appearance="Appearance.Accent" Type="ButtonType.Submit">
-                        Register
+                    <FluentButton Appearance="Appearance.Accent" Type="ButtonType.Submit" Loading="@IsSubmitting">
+                        @(IsSubmitting ? "Registering..." : "Register")
                     </FluentButton>
                 </div>
 
@@ -96,32 +116,39 @@
 
 @code {
     private RegisterModel RegisterModel { get; set; } = new();
-
     private string? Message { get; set; }
     private bool IsSuccess { get; set; }
+    private bool IsSubmitting { get; set; }
+    
+    private bool IsDuplicateEmailError => !string.IsNullOrEmpty(Message) && 
+        Message.Contains("email address is already registered", StringComparison.OrdinalIgnoreCase);
 
     private async Task SubmitAsync()
     {
-        if (RegisterModel.Password != RegisterModel.ConfirmPassword)
-        {
-            Message = "Passwords do not match.";
-            IsSuccess = false;
-            return;
-        }
-
-        var requestDto = new RegisterRequestDto(
-            RegisterModel.Name,
-            RegisterModel.Email,
-            RegisterModel.Password,
-            RegisterModel.ConfirmPassword
-        );
+        // Clear previous messages
+        Message = string.Empty;
+        IsSuccess = false;
+        IsSubmitting = true;
 
         try
         {
+            if (RegisterModel.Password != RegisterModel.ConfirmPassword)
+            {
+                Message = "Passwords do not match.";
+                IsSuccess = false;
+                return;
+            }
+
+            var requestDto = new RegisterRequestDto(
+                RegisterModel.Name,
+                RegisterModel.Email,
+                RegisterModel.Password,
+                RegisterModel.ConfirmPassword
+            );
+
             var response = await clientFactory
                 .CreateClient(Constants.HttpClients.EventingApi.Name)
                 .PostAsJsonAsync("api/account/register", requestDto);
-
 
             if (response.IsSuccessStatusCode)
             {
@@ -129,21 +156,124 @@
                 Message = "Registration successful! Redirecting to login...";
                 IsSuccess = true;
 
-                // small delay before redirect
+                // Small delay before redirect
                 await Task.Delay(1500);
                 NavManager.NavigateTo("/login");
             }
             else
             {
-                var error = await response.Content.ReadAsStringAsync();
-                Message = $"Registration failed: {error}";
-                IsSuccess = false;
+                await HandleRegistrationError(response);
             }
+        }
+        catch (HttpRequestException)
+        {
+            Message = "Unable to connect to the server. Please check your internet connection and try again.";
+            IsSuccess = false;
+        }
+        catch (TaskCanceledException)
+        {
+            Message = "Request timed out. Please try again.";
+            IsSuccess = false;
         }
         catch (Exception ex)
         {
-            Message = $"Error: Unable to reach server. {ex.Message}";
+            Message = "An unexpected error occurred. Please try again.";
             IsSuccess = false;
+            // In a real application, you might want to log the exception
+            Console.WriteLine($"Registration error: {ex.Message}");
         }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private async Task HandleRegistrationError(HttpResponseMessage response)
+    {
+        try
+        {
+            var errorResponse = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+            
+            if (errorResponse?.Errors != null && errorResponse.Errors.Any())
+            {
+                var errorMessages = new List<string>();
+                
+                foreach (var error in errorResponse.Errors)
+                {
+                    switch (error.Key)
+                    {
+                        case "DuplicateEmail":
+                            errorMessages.Add("This email address is already registered. Please use a different email or try logging in.");
+                            break;
+                        case "DuplicateUserName":
+                            errorMessages.Add("This username is already taken. Please choose a different username.");
+                            break;
+                        case "InvalidEmail":
+                            errorMessages.Add("Please enter a valid email address.");
+                            break;
+                        case "WeakPassword":
+                            errorMessages.Add("Password is too weak. Please use a stronger password with at least 8 characters, including uppercase, lowercase, numbers, and special characters.");
+                            break;
+                        case "Name":
+                            errorMessages.AddRange(error.Value.Select(v => $"Username: {v}"));
+                            break;
+                        case "Email":
+                            errorMessages.AddRange(error.Value.Select(v => $"Email: {v}"));
+                            break;
+                        case "Password":
+                            errorMessages.AddRange(error.Value.Select(v => $"Password: {v}"));
+                            break;
+                        default:
+                            // For any other validation errors, show the actual message
+                            errorMessages.AddRange(error.Value);
+                            break;
+                    }
+                }
+                
+                Message = string.Join(" ", errorMessages);
+            }
+            else if (!string.IsNullOrEmpty(errorResponse?.Title))
+            {
+                Message = errorResponse.Title;
+            }
+            else
+            {
+                Message = "Registration failed. Please check your information and try again.";
+            }
+        }
+        catch (JsonException)
+        {
+            // If we can't parse the JSON error response, try to get a simple error message
+            var errorText = await response.Content.ReadAsStringAsync();
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                Message = "Please check your information and try again.";
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                Message = "This email or username is already registered. Please try different credentials.";
+            }
+            else
+            {
+                Message = $"Registration failed. Please try again later. (Status: {(int)response.StatusCode})";
+            }
+        }
+        catch
+        {
+            Message = "Registration failed. Please try again.";
+        }
+        
+        IsSuccess = false;
+    }
+
+    // DTO for deserializing API error responses
+    public class ApiErrorResponse
+    {
+        public string? Type { get; set; }
+        public string? Title { get; set; }
+        public int Status { get; set; }
+        public Dictionary<string, string[]>? Errors { get; set; }
+        public string? TraceId { get; set; }
     }
 }
